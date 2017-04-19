@@ -58,7 +58,7 @@ func main() {
 		resp, err := SendTelemetry(honoClient, *tenant, deviceId)
 		for err == nil && resp.StatusCode == http.StatusAccepted {
 			time.Sleep(time.Second * 3)
-			SendTelemetry(honoClient, *tenant, deviceId)
+			resp, err = SendTelemetry(honoClient, *tenant, deviceId)
 		}
 
 	}
