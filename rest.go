@@ -29,12 +29,14 @@ type HonoClient struct {
 	sling *Sling
 }
 
+//creates a new HonoClient with base url configured.
 func NewHonoRestClient(httpClient *http.Client, baseUrl string) *HonoClient {
 	return &HonoClient{
 		sling: New().Client(httpClient).Base(baseUrl),
 	}
 }
 
+//registers a new device using the Hono's REST API
 func CreateDevice(h *HonoClient, tenant string, deviceId int) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s", "registration", tenant)
 	deviceBody := fmt.Sprintf("device_id=%d", deviceId)
@@ -44,9 +46,16 @@ func CreateDevice(h *HonoClient, tenant string, deviceId int) (*http.Response, e
 
 	resp, err := h.sling.Do(req, nil, nil)
 
+	if err != nil {
+		fmt.Println("Register device Error: ", err)
+	} else {
+		fmt.Println("Register device Repsonse: ", resp.Status)
+	}
+
 	return resp, err
 }
 
+//retrieves the already registered device using Hono's REST API
 func GetDevice(h *HonoClient, tenant string, deviceId int) (*DEVICE, *http.Response, error) {
 	device := new(DEVICE)
 	path := fmt.Sprintf("%s/%s/%d", "registration", tenant, deviceId)
@@ -54,15 +63,16 @@ func GetDevice(h *HonoClient, tenant string, deviceId int) (*DEVICE, *http.Respo
 	resp, err := h.sling.Do(req, device, nil)
 
 	if err != nil {
-		fmt.Println("GET Error: ", err.Error())
+		fmt.Println("GET device Error: ", err.Error())
 	} else {
-		fmt.Println("GET Response: ", resp.Status)
-		fmt.Printf("Received device: DeviceId[%s] enabled[%t]\n", device.ID, device.DATA.ENABLED)
+		fmt.Println("GET device Response: ", resp.Status)
+		fmt.Printf("Retrieved device: DeviceId[%s] enabled[%t]\n", device.ID, device.DATA.ENABLED)
 	}
 
 	return device, resp, err
 }
 
+//Sends random telemetry data to the Hono's REST Adapter
 func SendTelemetry(h *HonoClient, tenant string, deviceId int) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s/%d", "telemetry", tenant, deviceId)
 	//random temperature value

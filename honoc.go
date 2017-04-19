@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+//checks the user provided device id and returns the same. If none,
+//generates a new one and returns the same
 func GetDeviceId(deviceId int) int {
 	if deviceId == 0 {
 		return rand.Intn(time.Now().Nanosecond())
@@ -23,6 +25,7 @@ func main() {
 	tenant := flag.String("t", "DEFAULT_TENANT", "default value is DEFAULT_TENANT")
 	inputDeviceId := flag.Int("d", 0, "test device id. Leave it to default 0 to generate a random device id")
 	register := flag.Bool("r", false, "set to true to register a new device, default is false")
+	telemetry := flag.Bool("tm", false, "sends random telemetry data when set to true, default is false")
 
 	flag.Parse()
 
@@ -34,20 +37,13 @@ func main() {
 	//Register a new device
 	if *register {
 		resp, err := CreateDevice(honoClient, *tenant, deviceId)
-		fmt.Println("Create Repsonse: ", resp.Status)
-		if err != nil {
-			fmt.Println("Create Error: ", err)
-		}
 
-		if resp.StatusCode != http.StatusNotFound {
+		if err == nil && resp.StatusCode != http.StatusNotFound {
 			honoClient := NewHonoRestClient(httpClient, *url)
 			//Get the registered device
 			device, _, _ = GetDevice(honoClient, *tenant, deviceId)
-		} else {
-			fmt.Println("Not a valid Device-Get request issued as device is not created")
 		}
 	} else if *inputDeviceId != 0 {
-		//Get device already registered
 		honoClient := NewHonoRestClient(httpClient, *url)
 		//Get the registered device
 		device, _, _ = GetDevice(honoClient, *tenant, *inputDeviceId)
@@ -55,13 +51,13 @@ func main() {
 		fmt.Println("Not a valid Device Id is provided to retrieve")
 	}
 
-	if device.DATA.ENABLED {
+	if *telemetry && device.DATA.ENABLED {
 		//send telemetry data
 		honoClient := NewHonoRestClient(httpClient, *url)
 
 		resp, err := SendTelemetry(honoClient, *tenant, deviceId)
 		for err == nil && resp.StatusCode == http.StatusAccepted {
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 3)
 			SendTelemetry(honoClient, *tenant, deviceId)
 		}
 
