@@ -14,7 +14,12 @@ honoc simplifies the registration process and can be used to send telemetry data
 ## Install
 
     go get github.com/balsmn/honoc
+    go install github.com/balsmn/honoc
 
 ## Usage
 
 	honoc -?
+
+## Reference
+
+For more details about Eclipse Hono read [here](https://github.com/eclipse/hono)
