@@ -18,6 +18,11 @@ func GetDeviceId(deviceId int) int {
 	}
 }
 
+func GetRandomTemperature() string {
+	//random temperature value
+	return fmt.Sprintf("{\"temp\": %d}", rand.Int31n(100))
+}
+
 func main() {
 
 	//input parameters
@@ -26,6 +31,7 @@ func main() {
 	inputDeviceId := flag.Int("d", 0, "test device id. Leave it to default 0 to generate a random device id")
 	register := flag.Bool("r", false, "set to true to register a new device, default is false")
 	telemetry := flag.Bool("tm", false, "sends random telemetry data when set to true, default is false")
+	noDelay := flag.Bool("c", false, "sends telemetry continously without any delay, default is false")
 
 	flag.Parse()
 
@@ -36,29 +42,27 @@ func main() {
 
 	//Register a new device
 	if *register {
-		resp, err := CreateDevice(honoClient, *tenant, deviceId)
+		resp, err := CreateDevice(*honoClient, *tenant, deviceId)
 
 		if err == nil && resp.StatusCode != http.StatusNotFound {
-			honoClient := NewHonoRestClient(httpClient, *url)
 			//Get the registered device
-			device, _, _ = GetDevice(honoClient, *tenant, deviceId)
+			device, _, _ = GetDevice(*honoClient, *tenant, deviceId)
 		}
 	} else if *inputDeviceId != 0 {
-		honoClient := NewHonoRestClient(httpClient, *url)
 		//Get the registered device
-		device, _, _ = GetDevice(honoClient, *tenant, *inputDeviceId)
+		device, _, _ = GetDevice(*honoClient, *tenant, *inputDeviceId)
 	} else {
 		fmt.Println("Not a valid Device Id is provided to retrieve")
 	}
 
 	if *telemetry && device.DATA.ENABLED {
 		//send telemetry data
-		honoClient := NewHonoRestClient(httpClient, *url)
-
-		resp, err := SendTelemetry(honoClient, *tenant, deviceId)
+		resp, err := SendTelemetry(*honoClient, *tenant, deviceId, GetRandomTemperature())
 		for err == nil && resp.StatusCode == http.StatusAccepted {
-			time.Sleep(time.Second * 3)
-			resp, err = SendTelemetry(honoClient, *tenant, deviceId)
+			if *noDelay != true {
+				time.Sleep(time.Second * 1)
+			}
+			resp, err = SendTelemetry(*honoClient, *tenant, deviceId, GetRandomTemperature())
 		}
 
 	}

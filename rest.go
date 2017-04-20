@@ -2,8 +2,7 @@ package main
 
 import (
 	"fmt"
-	. "github.com/dghubble/sling"
-	"math/rand"
+	s "github.com/dghubble/sling"
 	"net/http"
 	"strings"
 )
@@ -26,23 +25,23 @@ type DEVICE_REG_PARAMS struct {
 
 //A wrapper struct around the Sling http client
 type HonoClient struct {
-	sling *Sling
+	sling *s.Sling
 }
 
 //creates a new HonoClient with base url configured.
 func NewHonoRestClient(httpClient *http.Client, baseUrl string) *HonoClient {
 	return &HonoClient{
-		sling: New().Client(httpClient).Base(baseUrl),
+		sling: s.New().Client(httpClient).Base(baseUrl),
 	}
 }
 
 //registers a new device using the Hono's REST API
-func CreateDevice(h *HonoClient, tenant string, deviceId int) (*http.Response, error) {
+func CreateDevice(h HonoClient, tenant string, deviceId int) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s", "registration", tenant)
 	deviceBody := fmt.Sprintf("device_id=%d", deviceId)
 	fmt.Println("Device registration data : ", deviceBody)
 	body := strings.NewReader(deviceBody)
-	req, _ := h.sling.Post(path).Set("Content-Type", "application/x-www-form-urlencoded").Body(body).Request()
+	req, _ := h.sling.New().Post(path).Set("Content-Type", "application/x-www-form-urlencoded").Body(body).Request()
 
 	resp, err := h.sling.Do(req, nil, nil)
 
@@ -56,10 +55,10 @@ func CreateDevice(h *HonoClient, tenant string, deviceId int) (*http.Response, e
 }
 
 //retrieves the already registered device using Hono's REST API
-func GetDevice(h *HonoClient, tenant string, deviceId int) (*DEVICE, *http.Response, error) {
+func GetDevice(h HonoClient, tenant string, deviceId int) (*DEVICE, *http.Response, error) {
 	device := new(DEVICE)
 	path := fmt.Sprintf("%s/%s/%d", "registration", tenant, deviceId)
-	req, _ := h.sling.Get(path).Request()
+	req, _ := h.sling.New().Get(path).Request()
 	resp, err := h.sling.Do(req, device, nil)
 
 	if err != nil {
@@ -72,14 +71,12 @@ func GetDevice(h *HonoClient, tenant string, deviceId int) (*DEVICE, *http.Respo
 	return device, resp, err
 }
 
-//Sends random telemetry data to the Hono's REST Adapter
-func SendTelemetry(h *HonoClient, tenant string, deviceId int) (*http.Response, error) {
+//Sends the given telemetry data to the Hono's REST Adapter
+func SendTelemetry(h HonoClient, tenant string, deviceId int, data string) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s/%d", "telemetry", tenant, deviceId)
-	//random temperature value
-	telemetryData := fmt.Sprintf("{\"temp\": %d}", rand.Int31n(100))
-	fmt.Println("Sending telemetry data : ", telemetryData)
-	body := strings.NewReader(telemetryData)
-	req, _ := h.sling.Put(path).Set("Content-Type", "application/json").Body(body).Request()
+	fmt.Println("Sending telemetry data : ", data)
+	body := strings.NewReader(data)
+	req, _ := h.sling.New().Put(path).Set("Content-Type", "application/json").Body(body).Request()
 
 	resp, err := h.sling.Do(req, nil, nil)
 	if err != nil {
