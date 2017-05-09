@@ -5,10 +5,8 @@ import (
 	s "github.com/dghubble/sling"
 	"net/http"
 	"strings"
+	"time"
 )
-
-type Honoc struct {
-}
 
 type PROTOCOL int
 
@@ -47,14 +45,18 @@ func NewHonoRestClient(httpClient *http.Client, baseUrl string) *HonoClient {
 }
 
 //registers a new device using the Hono's REST API
-func CreateDevice(h HonoClient, tenant string, deviceId int) (*http.Response, error) {
+func CreateDevice(h HonoClient, tenant string, deviceId int, metricsChannel chan int64) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s", "registration", tenant)
 	deviceBody := fmt.Sprintf("device_id=%d", deviceId)
 	fmt.Printf("[%d] Device registration data : %s\n", deviceId, deviceBody)
 	body := strings.NewReader(deviceBody)
 	req, _ := h.sling.New().Post(path).Set("Content-Type", "application/x-www-form-urlencoded").Body(body).Request()
 
+	start := time.Now().UnixNano()
 	resp, err := h.sling.Do(req, nil, nil)
+	end := time.Now().UnixNano()
+
+	metricsChannel <- ((end - start) / 1000000) //in milliseconds
 
 	if err != nil {
 		fmt.Printf("[%d] Register device Error: %s\n", deviceId, err.Error())
@@ -83,17 +85,23 @@ func GetDevice(h HonoClient, tenant string, deviceId int) (*DEVICE, *http.Respon
 }
 
 //sends the given telemetry data to the Hono's REST Adapter
-func SendTelemetry(h HonoClient, tenant string, deviceId int, data string) (*http.Response, error) {
+func SendTelemetry(h HonoClient, tenant string, deviceId int, data string, metricsChannel chan int64) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s/%d", "telemetry", tenant, deviceId)
 	fmt.Printf("[%d] Sending telemetry data : %s\n", deviceId, data)
 	body := strings.NewReader(data)
 	req, _ := h.sling.New().Put(path).Set("Content-Type", "application/json").Body(body).Request()
+	fmt.Println("Sending telemetry request :", req)
 
+	start := time.Now().UnixNano()
 	resp, err := h.sling.Do(req, nil, nil)
+	end := time.Now().UnixNano()
+
+	metricsChannel <- ((end - start) / 1000000) //in milliseconds
+
 	if err != nil {
 		fmt.Printf("[%d] Telemetry Error: %s\n", deviceId, err.Error())
 	} else {
-		fmt.Printf("[%d] Telemetry Response: %d\n", deviceId, resp.StatusCode)
+		fmt.Printf("[%d] Telemetry Response: %d\n", deviceId, resp)
 	}
 	return resp, err
 }
