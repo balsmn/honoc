@@ -1,4 +1,4 @@
-package main
+package honoc
 
 import (
 	"flag"
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type TelemetryControl struct {
+type telemetryControl struct {
 	telemetry bool //indicates whether telemetry data should be sent
 	noDelay   bool //whether telemetry data should be sent without any delay
 	protocol  PROTOCOL
@@ -17,54 +17,59 @@ type TelemetryControl struct {
 
 //checks the user provided device id and returns the same. If none,
 //generates a new one and returns the same
-func GetDeviceId(deviceId int) int {
+func getDeviceId(deviceId int) int {
 	if deviceId == 0 {
-		return GetRandomDeviceId()
+		return getRandomDeviceId()
 	} else {
 		return deviceId
 	}
 }
 
 //generates a random device id
-func GetRandomDeviceId() int {
+func getRandomDeviceId() int {
 	return rand.Intn(time.Now().Nanosecond())
 }
 
 //generate random temperature value
-func GetRandomTemperature() string {
+func getRandomTemperature() string {
 	return fmt.Sprintf("{\"temp\": %d}", rand.Int31n(100))
 }
 
 //registers a device and sends telemetry if registration was successful
-func RegisterAndSendTelemetryViaRest(honoClient HonoClient, tenant string, deviceId int, tc TelemetryControl, registrationMetrics chan int64, telemetryMetrics chan int64) {
-	resp, err := CreateDevice(honoClient, tenant, deviceId, registrationMetrics)
+func registerAndSendTelemetryViaRest(h HonoClient, tenant string, deviceId int, tc telemetryControl, registrationMetrics chan int64, telemetryMetrics chan int64) {
+	resp, err := h.CreateDevice(tenant, deviceId, registrationMetrics)
 
 	if err == nil && resp.StatusCode != http.StatusNotFound {
-		SendTelemetryViaRest(honoClient, tenant, deviceId, tc, telemetryMetrics)
+		sendTelemetryViaRest(h, tenant, deviceId, tc, telemetryMetrics)
 	}
 }
 
 //gets the device from Hono, if the device is active, sends telemetry data
-func SendTelemetryViaRest(honoClient HonoClient, tenant string, deviceId int, tc TelemetryControl, telemetryMetrics chan int64) {
+func sendTelemetryViaRest(h HonoClient, tenant string, deviceId int, tc telemetryControl, telemetryMetrics chan int64) {
 	//get the registered device
-	device, _, _ := GetDevice(honoClient, tenant, deviceId)
+	device, _, _ := h.GetDevice(tenant, deviceId)
 
 	if tc.telemetry && device.DATA.ENABLED {
 		//send telemetry data
-		resp, err := SendTelemetry(honoClient, tenant, deviceId, GetRandomTemperature(), telemetryMetrics)
+		resp, err := h.SendTelemetry(tenant, deviceId, getRandomTemperature(), telemetryMetrics)
+		//break out of loop if server doesn't accept any data
 		for err == nil && resp.StatusCode == http.StatusAccepted {
 			if tc.noDelay != true {
 				time.Sleep(time.Second * 1)
 			}
-			resp, err = SendTelemetry(honoClient, tenant, deviceId, GetRandomTemperature(), telemetryMetrics)
+			resp, err = h.SendTelemetry(tenant, deviceId, getRandomTemperature(), telemetryMetrics)
 		}
 	}
 }
 
-func PrintMetrics(metricName string, metricsChannel chan int64) {
-	for {
-		fmt.Printf("%s - %d ms\n", metricName, <-metricsChannel)
-	}
+func printMetrics(metricName string, metricsChannel chan int64) {
+	fmt.Printf("%s - %d ms\n", metricName, <-metricsChannel)
+}
+
+func awaitTermination() {
+	//infinite loop to prevent program from exiting
+	var input string
+	fmt.Scanln(&input)
 }
 
 func main() {
@@ -91,7 +96,7 @@ func main() {
 	telemetry := false
 
 	if len(os.Args) == 1 {
-		flag.Usage()
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
@@ -106,6 +111,7 @@ func main() {
 		break
 	default:
 		fmt.Printf("%q is not valid command.\n", os.Args[1])
+		flag.PrintDefaults()
 		os.Exit(2)
 	}
 
@@ -120,32 +126,30 @@ func main() {
 
 	if register {
 
-		telemetryControl := &TelemetryControl{telemetry: *r_telemetry, noDelay: *noDelay, protocol: protocol}
+		tc := telemetryControl{telemetry: *r_telemetry, noDelay: *noDelay, protocol: protocol}
 
 		httpClient := http.DefaultClient
 		honoClient := NewHonoRestClient(httpClient, *r_url)
 
-		deviceId := GetDeviceId(*r_inputDeviceId)
+		deviceId := getDeviceId(*r_inputDeviceId)
 		//register a new device
 		for i := 0; i < *noOfClients; i++ {
-			go RegisterAndSendTelemetryViaRest(*honoClient, *r_tenant, deviceId, *telemetryControl, registrationMetrics, telemetryMetrics)
-			go PrintMetrics("registration", registrationMetrics)
-			go PrintMetrics("telemetry", telemetryMetrics)
-			deviceId = GetRandomDeviceId()
+			go registerAndSendTelemetryViaRest(honoClient, *r_tenant, deviceId, tc, registrationMetrics, telemetryMetrics)
+			go printMetrics("registration", registrationMetrics)
+			go printMetrics("telemetry", telemetryMetrics)
+			deviceId = getRandomDeviceId()
 		}
-		var input string
-		fmt.Scanln(&input)
 	} else if telemetry && *inputDeviceId != 0 {
-		telemetryControl := &TelemetryControl{telemetry: true, noDelay: false, protocol: protocol}
+		tc := telemetryControl{telemetry: true, noDelay: false, protocol: protocol}
 
 		httpClient := http.DefaultClient
 		honoClient := NewHonoRestClient(httpClient, *t_url)
 
-		go SendTelemetryViaRest(*honoClient, *t_tenant, *inputDeviceId, *telemetryControl, telemetryMetrics)
-		go PrintMetrics("telemetry", telemetryMetrics)
-		var input string
-		fmt.Scanln(&input)
+		go sendTelemetryViaRest(honoClient, *t_tenant, *inputDeviceId, tc, telemetryMetrics)
+		go printMetrics("telemetry", telemetryMetrics)
+
 	} else {
 		fmt.Println("Not a valid Device Id is provided to retrieve")
 	}
+	awaitTermination()
 }

@@ -1,4 +1,4 @@
-package main
+package honoc
 
 import (
 	"fmt"
@@ -38,14 +38,12 @@ type HonoClient struct {
 }
 
 //creates a new HonoClient with base url configured.
-func NewHonoRestClient(httpClient *http.Client, baseUrl string) *HonoClient {
-	return &HonoClient{
-		sling: s.New().Client(httpClient).Base(baseUrl),
-	}
+func NewHonoRestClient(httpClient *http.Client, baseUrl string) HonoClient {
+	return HonoClient{sling: s.New().Client(httpClient).Base(baseUrl)}
 }
 
 //registers a new device using the Hono's REST API
-func CreateDevice(h HonoClient, tenant string, deviceId int, metricsChannel chan int64) (*http.Response, error) {
+func (h HonoClient) CreateDevice(tenant string, deviceId int, metricsChannel chan int64) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s", "registration", tenant)
 	deviceBody := fmt.Sprintf("device_id=%d", deviceId)
 	fmt.Printf("[%d] Device registration data : %s\n", deviceId, deviceBody)
@@ -68,7 +66,7 @@ func CreateDevice(h HonoClient, tenant string, deviceId int, metricsChannel chan
 }
 
 //retrieves the already registered device using Hono's REST API
-func GetDevice(h HonoClient, tenant string, deviceId int) (*DEVICE, *http.Response, error) {
+func (h HonoClient) GetDevice(tenant string, deviceId int) (*DEVICE, *http.Response, error) {
 	device := new(DEVICE)
 	path := fmt.Sprintf("%s/%s/%d", "registration", tenant, deviceId)
 	req, _ := h.sling.New().Get(path).Request()
@@ -85,7 +83,7 @@ func GetDevice(h HonoClient, tenant string, deviceId int) (*DEVICE, *http.Respon
 }
 
 //sends the given telemetry data to the Hono's REST Adapter
-func SendTelemetry(h HonoClient, tenant string, deviceId int, data string, metricsChannel chan int64) (*http.Response, error) {
+func (h HonoClient) SendTelemetry(tenant string, deviceId int, data string, metricsChannel chan int64) (*http.Response, error) {
 	path := fmt.Sprintf("%s/%s/%d", "telemetry", tenant, deviceId)
 	fmt.Printf("[%d] Sending telemetry data : %s\n", deviceId, data)
 	body := strings.NewReader(data)
