@@ -1,4 +1,4 @@
-package honoc
+package main
 
 import (
 	"flag"
@@ -12,7 +12,7 @@ import (
 type telemetryControl struct {
 	telemetry bool //indicates whether telemetry data should be sent
 	noDelay   bool //whether telemetry data should be sent without any delay
-	protocol  PROTOCOL
+	p         protocol
 }
 
 //checks the user provided device id and returns the same. If none,
@@ -36,11 +36,11 @@ func getRandomTemperature() string {
 }
 
 //registers a device and sends telemetry if registration was successful
-func registerAndSendTelemetryViaRest(h HonoClient, tenant string, deviceId int, tc telemetryControl, registrationMetrics chan int64, telemetryMetrics chan int64) {
+func registerAndSendTelemetryViaRest(h *HonoClient, tenant string, deviceId int, tc telemetryControl, registrationMetrics chan int64, telemetryMetrics chan int64) {
 	resp, err := h.CreateDevice(tenant, deviceId, registrationMetrics)
 
 	if err == nil && resp.StatusCode != http.StatusNotFound {
-		sendTelemetryViaRest(h, tenant, deviceId, tc, telemetryMetrics)
+		sendTelemetryViaRest(*h, tenant, deviceId, tc, telemetryMetrics)
 	}
 }
 
@@ -49,7 +49,7 @@ func sendTelemetryViaRest(h HonoClient, tenant string, deviceId int, tc telemetr
 	//get the registered device
 	device, _, _ := h.GetDevice(tenant, deviceId)
 
-	if tc.telemetry && device.DATA.ENABLED {
+	if tc.telemetry && device.data.enabled {
 		//send telemetry data
 		resp, err := h.SendTelemetry(tenant, deviceId, getRandomTemperature(), telemetryMetrics)
 		//break out of loop if server doesn't accept any data
@@ -126,7 +126,7 @@ func main() {
 
 	if register {
 
-		tc := telemetryControl{telemetry: *r_telemetry, noDelay: *noDelay, protocol: protocol}
+		tc := telemetryControl{telemetry: *r_telemetry, noDelay: *noDelay, p: protocol}
 
 		httpClient := http.DefaultClient
 		honoClient := NewHonoRestClient(httpClient, *r_url)
@@ -134,13 +134,13 @@ func main() {
 		deviceId := getDeviceId(*r_inputDeviceId)
 		//register a new device
 		for i := 0; i < *noOfClients; i++ {
-			go registerAndSendTelemetryViaRest(honoClient, *r_tenant, deviceId, tc, registrationMetrics, telemetryMetrics)
+			go registerAndSendTelemetryViaRest(&honoClient, *r_tenant, deviceId, tc, registrationMetrics, telemetryMetrics)
 			go printMetrics("registration", registrationMetrics)
 			go printMetrics("telemetry", telemetryMetrics)
 			deviceId = getRandomDeviceId()
 		}
 	} else if telemetry && *inputDeviceId != 0 {
-		tc := telemetryControl{telemetry: true, noDelay: false, protocol: protocol}
+		tc := telemetryControl{telemetry: true, noDelay: false, p: protocol}
 
 		httpClient := http.DefaultClient
 		honoClient := NewHonoRestClient(httpClient, *t_url)

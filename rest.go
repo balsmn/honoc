@@ -1,4 +1,4 @@
-package honoc
+package main
 
 import (
 	"fmt"
@@ -8,28 +8,28 @@ import (
 	"time"
 )
 
-type PROTOCOL int
+type protocol int
 
 const (
-	HTTP PROTOCOL = 1 + iota
+	HTTP protocol = 1 + iota
 	MQTT
 	AMQP
 )
 
 //data structure representing a device data as returned by Hono Rest adapter
-type DATA struct {
-	ENABLED bool `json:enabled`
+type data struct {
+	enabled bool `json:enabled`
 }
 
 //GET device response from Hono Rest adapter
-type DEVICE struct {
-	ID   string `json:"id"`
-	DATA `json:"data"`
+type device struct {
+	id   string `json:"id"`
+	data `json:"data"`
 }
 
 //input data structure used for registering a device.
-type DEVICE_REG_PARAMS struct {
-	DEVICE_ID int `url:"device_id"`
+type devRegParam struct {
+	deviceId int `url:"device_id"`
 }
 
 //a wrapper struct around the Sling http client
@@ -66,20 +66,20 @@ func (h HonoClient) CreateDevice(tenant string, deviceId int, metricsChannel cha
 }
 
 //retrieves the already registered device using Hono's REST API
-func (h HonoClient) GetDevice(tenant string, deviceId int) (*DEVICE, *http.Response, error) {
-	device := new(DEVICE)
+func (h HonoClient) GetDevice(tenant string, deviceId int) (*device, *http.Response, error) {
+	dev := new(device)
 	path := fmt.Sprintf("%s/%s/%d", "registration", tenant, deviceId)
 	req, _ := h.sling.New().Get(path).Request()
-	resp, err := h.sling.Do(req, device, nil)
+	resp, err := h.sling.Do(req, dev, nil)
 
 	if err != nil {
 		fmt.Printf("[%d] GET device Error: %s\n", deviceId, err.Error())
 	} else {
 		fmt.Printf("[%d] GET device Response: %s\n", deviceId, resp.Status)
-		fmt.Printf("[%d] Device enabled[%t]\n", deviceId, device.DATA.ENABLED)
+		fmt.Printf("[%d] Device enabled[%t]\n", deviceId, dev.data.enabled)
 	}
 
-	return device, resp, err
+	return dev, resp, err
 }
 
 //sends the given telemetry data to the Hono's REST Adapter
